@@ -51,6 +51,7 @@ jobs:
           echo "GitHub Actor: ${{ github.actor }}"
           echo "GitHub Ref: ${{ github.ref }}"
           echo "Workflow: ${{ github.workflow }}"
+          echo "Event: ${{ github.event_name }}"
           
       - name: Quick secrets validation
         run: |
@@ -63,9 +64,10 @@ jobs:
           echo "✅ All required secrets are configured"
           
       - name: Run sync (DRY_RUN mode)
-        if: ${{ inputs.dry_run == 'true' || (github.event_name == 'schedule' && secrets.DRY_RUN == 'true') }}
+        if: ${{ inputs.dry_run == 'true' || github.event_name == 'schedule' }}
         run: |
           echo "🔍 Running in DRY_RUN mode - no actual changes will be made"
+          echo "This step validates key files and connection without modifying Notion data"
           python app/sync/sync_runner.py
         env:
           DRY_RUN: 'true'
@@ -76,9 +78,9 @@ jobs:
           BLACKBOARD_DOMAIN: ${{ secrets.BLACKBOARD_DOMAIN }}
           
       - name: Run sync (PRODUCTION mode)
-        if: ${{ inputs.dry_run == 'false' && (github.event_name != 'schedule' || secrets.DRY_RUN != 'true') }}
+        if: ${{ inputs.dry_run == 'false' }}
         run: |
-          echo "🚀 Running in PRODUCTION mode - changes will be applied"
+          echo "🚀 Running in PRODUCTION mode - changes will be applied to Notion"
           python app/sync/sync_runner.py
         env:
           DRY_RUN: 'false'
