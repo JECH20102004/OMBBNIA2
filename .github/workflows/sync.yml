@@ -1,25 +1,87 @@
 name: Blackboard → Notion Sync
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in DRY_RUN mode (no actual sync)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
   schedule:
     - cron: '0 6 * * *'
 
 jobs:
-  dryrun:
+  sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      - run: |
+          
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Print environment (safe)
+        run: |
           python -V
-          echo "DRY_RUN=${{ secrets.DRY_RUN }}"
-      - name: Ejecutar sincronización
-        if: ${{ secrets.DRY_RUN != 'true' }}
-        run: python app/sync/sync_runner.py
+          echo "GitHub Actor: ${{ github.actor }}"
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "Workflow: ${{ github.workflow }}"
+          
+      - name: Quick secrets validation
+        run: |
+          echo "Validating required secrets..."
+          if [ -z "${{ secrets.NOTION_API_KEY }}" ]; then echo "❌ NOTION_API_KEY not set"; exit 1; fi
+          if [ -z "${{ secrets.NOTION_DATABASE_ID }}" ]; then echo "❌ NOTION_DATABASE_ID not set"; exit 1; fi
+          if [ -z "${{ secrets.BLACKBOARD_CLIENT_ID }}" ]; then echo "❌ BLACKBOARD_CLIENT_ID not set"; exit 1; fi
+          if [ -z "${{ secrets.BLACKBOARD_CLIENT_SECRET }}" ]; then echo "❌ BLACKBOARD_CLIENT_SECRET not set"; exit 1; fi
+          if [ -z "${{ secrets.BLACKBOARD_DOMAIN }}" ]; then echo "❌ BLACKBOARD_DOMAIN not set"; exit 1; fi
+          echo "✅ All required secrets are configured"
+          
+      - name: Run sync (DRY_RUN mode)
+        if: ${{ inputs.dry_run == 'true' || (github.event_name == 'schedule' && secrets.DRY_RUN == 'true') }}
+        run: |
+          echo "🔍 Running in DRY_RUN mode - no actual changes will be made"
+          python app/sync/sync_runner.py
         env:
+          DRY_RUN: 'true'
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          BLACKBOARD_CLIENT_ID: ${{ secrets.BLACKBOARD_CLIENT_ID }}
+          BLACKBOARD_CLIENT_SECRET: ${{ secrets.BLACKBOARD_CLIENT_SECRET }}
+          BLACKBOARD_DOMAIN: ${{ secrets.BLACKBOARD_DOMAIN }}
+          
+      - name: Run sync (PRODUCTION mode)
+        if: ${{ inputs.dry_run == 'false' && (github.event_name != 'schedule' || secrets.DRY_RUN != 'true') }}
+        run: |
+          echo "🚀 Running in PRODUCTION mode - changes will be applied"
+          python app/sync/sync_runner.py
+        env:
+          DRY_RUN: 'false'
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           BLACKBOARD_CLIENT_ID: ${{ secrets.BLACKBOARD_CLIENT_ID }}
