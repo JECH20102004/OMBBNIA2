@@ -55,6 +55,7 @@ jobs:
         run: |
           echo "🚀 Running Blackboard → Notion sync in production mode"
           echo "Changes will be applied to Notion database"
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           python app/sync/sync_runner.py
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
