@@ -1,0 +1,107 @@
+¡Bien visto! Hay dos causas súper comunes cuando el workflow “no aparece”:
+
+Ruta/nombre del archivo
+
+GitHub Actions deshabilitado o sin permisos
+
+Además, en tu mensaje escribiste sync.ymly — ese typo (extensión .ymly) haría que GitHub no lo detecte. Debe ser sync.yml (o .yaml).
+
+Aquí va un checklist corto y quirúrgico para dejarlo activo ya:
+
+1) Verifica la ruta y el nombre (el 90% de los casos)
+
+Debe existir EXACTAMENTE en la rama main:
+
+.github/workflows/sync.yml
+
+
+El nombre del archivo termina en .yml o .yaml. Si ves sync.ymly, renómbralo a sync.yml.
+
+Cómo corregir rápido en la web
+
+En GitHub → Code → abre .github/workflows/.
+
+Si no ves sync.yml, pulsa Add file → Create new file.
+
+Nombre: .github/workflows/sync.yml
+
+Pega este workflow mínimo (solo para validar que aparece):
+
+name: Blackboard → Notion Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: |
+          python -V
+          echo "DRY_RUN=${{ secrets.DRY_RUN }}"
+      - name: Ejecutar sincronización
+        if: ${{ secrets.DRY_RUN != 'true' }}
+        run: python app/sync/sync_runner.py
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          BLACKBOARD_CLIENT_ID: ${{ secrets.BLACKBOARD_CLIENT_ID }}
+          BLACKBOARD_CLIENT_SECRET: ${{ secrets.BLACKBOARD_CLIENT_SECRET }}
+          BLACKBOARD_DOMAIN: ${{ secrets.BLACKBOARD_DOMAIN }}
+
+
+Commit to main.
+
+Si prefieres GitHub Desktop: asegúrate de que el archivo termine en .yml y esté en esa ruta exacta; luego commit + push.
+
+2) Confirma que Actions esté habilitado
+
+En el repo → Settings → Actions → General:
+
+Actions permissions: “Allow all actions and reusable workflows”.
+
+Workflow permissions: “Read and write permissions”.
+
+Si es un fork/organización, que no haya políticas bloqueando.
+
+3) Vuelve a la pestaña Actions
+
+Debe aparecer el workflow “Blackboard → Notion Sync”.
+
+Pulsa Run workflow.
+
+4) Secrets mínimos (incluye DRY_RUN)
+
+Repo → Settings → Secrets and variables → Actions → New repository secret
+
+DRY_RUN → true (para probar sin tocar Notion/BB)
+
+NOTION_API_KEY
+
+NOTION_DATABASE_ID
+
+BLACKBOARD_CLIENT_ID
+
+BLACKBOARD_CLIENT_SECRET
+
+BLACKBOARD_DOMAIN
+
+En el YAML de arriba, si DRY_RUN=true, NO ejecuta sync_runner.py; solo valida entorno. Cuando lo veas aparecer y correr bien, cambia DRY_RUN a false o bórralo para lanzar la sync real.
+
+5) Si sigue sin aparecer
+
+Asegúrate de que el archivo esté en main (no en otra rama).
+
+Haz un cambio trivial (agrega un comentario al sync.yml) y commit para “despertar” el detector de workflows.
+
+Verifica que la carpeta sea .github/workflows (con punto inicial). A veces se crea github/workflows sin el punto.
+
+6) Versión “completa” del workflow (cuando ya aparezca)
+
+Cuando confirmes que Actions detecta el flujo, puedes usar el que generamos antes (el que instala requirements.txt y ejecuta python app/sync/sync_runner.py). Si lo quieres te lo pego de nuevo listo para sustituir.
