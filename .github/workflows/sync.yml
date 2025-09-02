@@ -1,23 +1,11 @@
 name: Blackboard → Notion Sync
-
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
-
 on:
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Run in DRY_RUN mode (no actual sync)'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
   schedule:
     - cron: '0 6 * * *'
-
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -63,27 +51,12 @@ jobs:
           if [ -z "${{ secrets.BLACKBOARD_DOMAIN }}" ]; then echo "❌ BLACKBOARD_DOMAIN not set"; exit 1; fi
           echo "✅ All required secrets are configured"
           
-      - name: Run sync (DRY_RUN mode)
-        if: ${{ inputs.dry_run == 'true' || github.event_name == 'schedule' }}
+      - name: Run Blackboard → Notion Sync
         run: |
-          echo "🔍 Running in DRY_RUN mode - no actual changes will be made"
-          echo "This step validates key files and connection without modifying Notion data"
+          echo "🚀 Running Blackboard → Notion sync in production mode"
+          echo "Changes will be applied to Notion database"
           python app/sync/sync_runner.py
         env:
-          DRY_RUN: 'true'
-          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          BLACKBOARD_CLIENT_ID: ${{ secrets.BLACKBOARD_CLIENT_ID }}
-          BLACKBOARD_CLIENT_SECRET: ${{ secrets.BLACKBOARD_CLIENT_SECRET }}
-          BLACKBOARD_DOMAIN: ${{ secrets.BLACKBOARD_DOMAIN }}
-          
-      - name: Run sync (PRODUCTION mode)
-        if: ${{ inputs.dry_run == 'false' }}
-        run: |
-          echo "🚀 Running in PRODUCTION mode - changes will be applied to Notion"
-          python app/sync/sync_runner.py
-        env:
-          DRY_RUN: 'false'
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           BLACKBOARD_CLIENT_ID: ${{ secrets.BLACKBOARD_CLIENT_ID }}
